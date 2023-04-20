@@ -1,0 +1,51 @@
+version: "3.3"
+services:
+  model_master_nginx:
+    image: pubalglib/model-master-nginx:1.0.0
+    ports:
+      - ${SERVER_HOST_PORT}:8000
+    networks:
+      - model_master_network
+    restart: on-failure:10
+    depends_on:
+      - model_master_server
+  model_master_server:
+    image: pubalglib/model-master-server:1.0.0
+    environment:
+      SERVER_HOST: ${SERVER_HOST_DNS}:${SERVER_HOST_PORT}
+      MYSQL_DNS: ${MYSQL_INITIAL_USER}:${MYSQL_INITIAL_PASSWORD}@tcp(model_master_db:3306)/model_master_db?charset=utf8mb4&parseTime=True&loc=Local
+    volumes:
+      - ${PWD}/model-master-server/logs:/app/logs
+      - ${PWD}/model-master-server/data/cas:/app/.cas
+      - ${PWD}/model-master-server/data/kvs:/app/.kvs
+    depends_on:
+      - model_master_db
+      - infer_server
+    restart: on-failure:10
+    networks:
+      - model_master_network
+  model_master_db:
+    image: mysql:8
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: model_master_db
+      MYSQL_USER: ${MYSQL_INITIAL_USER}
+      MYSQL_PASSWORD: ${MYSQL_INITIAL_PASSWORD}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    volumes:
+      - ${PWD}/model-master-db/data:/var/lib/mysql
+    networks:
+      - model_master_network
+    restart: on-failure:10
+  infer_server:
+    image: pubalglib/inference-server:1.0.0
+    volumes:
+      - ${PWD}/infer-server/db:/workspace/inference-server/db
+      - ${PWD}/infer-server/models:/workspace/inference-server/models
+    networks:
+      - model_master_network
+    restart: on-failure:10
+
+networks:
+  model_master_network:
